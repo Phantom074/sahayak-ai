@@ -80,15 +80,19 @@ jobs:
 
       - name: Build all service packages
         run: |
-          mkdir -p artifacts
+          mkdir -p "${GITHUB_WORKSPACE}/artifacts"
           for service in voice-service conversation-orchestrator scheme-retrieval-service eligibility-engine user-profile-service scheme-management-service; do
             echo "Building $service..."
+            if [ ! -d "services/$service" ]; then
+              echo "WARNING: services/$service not found, skipping..."
+              continue
+            fi
             cd services/$service
             mkdir -p dist
             pip install -r requirements.txt -t dist/ -q
             cp -r src dist/ 2>/dev/null || true
-            cd dist && zip -r ../../artifacts/${service}.zip . -q
-            cd ../..
+            cd dist && zip -r "${GITHUB_WORKSPACE}/artifacts/${service}.zip" . -q
+            cd "${GITHUB_WORKSPACE}"
             echo "$service built: $(du -sh artifacts/${service}.zip | cut -f1)"
           done
 
