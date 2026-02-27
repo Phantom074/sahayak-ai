@@ -1,0 +1,130 @@
+
+name: Sahayak AI — Production Deployment
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy-infrastructure:
+    name: Deploy Infrastructure (Terraform)
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "1.7.0" }
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          cd infrastructure/terraform/environments/prod
+          terraform init
+          terraform plan -out=tfplan -var-file=terraform.tfvars
+          terraform show -no-color tfplan > plan_output.txt
+
+      - name: Post plan to PR
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('infrastructure/terraform/environments/prod/plan_output.txt', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '## Terraform Plan\n```\n' + plan.substring(0, 5000) + '\n```'
+            })
+
+      - name: Terraform Apply
+        run: |
+          cd infrastructure/terraform/environments/prod
+          terraform apply tfplan
+
+  deploy-lambdas:
+    name: Deploy Lambda Functions (Blue-Green)
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-south-1
+
+      - uses: actions/download-artifact@v3
+        with: { name: lambda-packages, path: artifacts }
+
+      - name: Blue-Green Lambda deployment
+        run: |
+          SERVICES=("voice-service:voice-stt" "voice-service:voice-tts" "conversation-orchestrator:conversation-orchestrator" "scheme-retrieval-service:scheme-retrieval" "eligibility-engine:eligibility-engine" "user-profile-service:user-profile")
+
+          for mapping in "${SERVICES[@]}"; do
+            pkg="${mapping%%:*}"
+            func="sahayak-prod-${mapping##*:}"
+            echo "Deploying $func from $pkg..."
+
+            # Update function code
+            aws lambda update-function-code \
+              --function-name "$func" \
+              --zip-file "fileb://artifacts/${pkg}.zip"
+
+            # Wait for update
+            aws lambda wait function-updated --function-name "$func"
+
+            # Publish new version
+            VERSION=$(aws lambda publish-version --function-name "$func" --query "Version" --output text)
+            echo "Published version $VERSION for $func"
+
+            # Canary: route 10% to new version
+            aws lambda update-alias --function-name "$func" --name LIVE \
+              --routing-config "AdditionalVersionWeights={\"$VERSION\"=0.1}"
+
+            echo "Canary 10% live for $func v$VERSION — monitoring 5 min..."
+            sleep 300
+
+            # Check error rate in canary window
+            ERRORS=$(aws cloudwatch get-metric-statistics \
+              --namespace Sahayak/Services \
+              --metric-name FailedRequests \
+              --dimensions Name=ServiceName,Value="$func" \
+              --start-time $(date -u -d '6 minutes ago' +%Y-%m-%dT%H:%M:%S) \
+              --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+              --period 300 --statistics Sum \
+              --query 'Datapoints[0].Sum' --output text)
+
+            if [ "$ERRORS" == "None" ] || [ "${ERRORS%.*}" -lt 5 ]; then
+              echo "Canary healthy — shifting 100% to v$VERSION"
+              aws lambda update-alias --function-name "$func" --name LIVE \
+                --function-version "$VERSION" \
+                --routing-config "AdditionalVersionWeights={}"
+            else
+              echo "CANARY FAILED: $ERRORS errors — rolling back $func"
+              aws lambda update-alias --function-name "$func" --name LIVE \
+                --routing-config "AdditionalVersionWeights={}"
+              exit 1
+            fi
+          done
+
+  smoke-test:
+    name: Production Smoke Tests
+    needs: deploy-lambdas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install requests
+      - name: Run smoke tests
+        run: |
+          python3 scripts/smoke_test.py --env prod --api-url ${{ secrets.PROD_API_URL }}

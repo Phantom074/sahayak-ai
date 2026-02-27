@@ -1,0 +1,276 @@
+openapi: 3.0.3
+info:
+  title: Sahayak AI API
+  description: Voice-first multilingual government scheme assistant for Indian citizens
+  version: 1.0.0
+  contact:
+    email: platform@sahayak.gov.in
+
+servers:
+  - url: https://api.sahayak.gov.in/v1
+    description: Production
+  - url: https://api-dev.sahayak.gov.in/v1
+    description: Development
+
+security:
+  - CognitoJWT: []
+
+paths:
+  /conversations:
+    post:
+      summary: Start a new conversation session
+      tags: [Conversation]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                language_preference:
+                  type: string
+                  enum: [hi, en, auto]
+                  default: auto
+                channel:
+                  type: string
+                  enum: [web, mobile, ivr, kiosk]
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResponse"
+
+  /conversations/{session_id}/turns:
+    post:
+      summary: Submit a conversation turn (voice or text)
+      tags: [Conversation]
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TurnRequest"
+      responses:
+        "200":
+          description: Turn processed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TurnResponse"
+
+  /schemes:
+    get:
+      summary: Search or list schemes
+      tags: [Schemes]
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+          description: Search query
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of schemes
+
+  /eligibility/check:
+    post:
+      summary: Check eligibility for a scheme
+      tags: [Eligibility]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scheme_id]
+              properties:
+                scheme_id:
+                  type: string
+                user_profile:
+                  $ref: "#/components/schemas/UserProfile"
+      responses:
+        "200":
+          description: Eligibility decision
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EligibilityDecision"
+
+  /users/consent:
+    post:
+      summary: Record user consent (DPDP Act)
+      tags: [Privacy]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [granted_purposes]
+              properties:
+                granted_purposes:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: Consent recorded
+
+  /users/data:
+    delete:
+      summary: Request data erasure (Right to be forgotten)
+      tags: [Privacy]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        "202":
+          description: Erasure request accepted
+
+components:
+  securitySchemes:
+    CognitoJWT:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    TurnRequest:
+      type: object
+      required: [input_type]
+      properties:
+        input_type:
+          type: string
+          enum: [text, audio]
+        text:
+          type: string
+          description: Required if input_type=text
+        audio_s3_key:
+          type: string
+          description: S3 key of audio file (required if input_type=audio)
+        language_hint:
+          type: string
+          enum: [hi, en, auto]
+          default: auto
+        user_context:
+          type: object
+          properties:
+            state:
+              type: string
+            age:
+              type: integer
+            occupation:
+              type: string
+
+    TurnResponse:
+      type: object
+      properties:
+        turn_id:
+          type: string
+        session_id:
+          type: string
+        detected_language:
+          type: string
+        intent:
+          type: object
+          properties:
+            name:
+              type: string
+            confidence:
+              type: number
+        response:
+          type: object
+          properties:
+            text:
+              type: string
+            audio_presigned_url:
+              type: string
+            audio_expiry:
+              type: integer
+        eligibility_quick_check:
+          $ref: "#/components/schemas/EligibilityDecision"
+        follow_up_suggestions:
+          type: array
+          items:
+            type: string
+        metadata:
+          type: object
+          properties:
+            latency_ms:
+              type: integer
+            rag_sources_used:
+              type: integer
+
+    EligibilityDecision:
+      type: object
+      properties:
+        scheme_id:
+          type: string
+        status:
+          type: string
+          enum: [eligible, ineligible, partial, more_info_needed]
+        score:
+          type: number
+        likely_eligible:
+          type: boolean
+        missing_info:
+          type: array
+          items:
+            type: string
+        missing_documents:
+          type: array
+          items:
+            type: string
+        recommendation_hi:
+          type: string
+        recommendation_en:
+          type: string
+        action_url:
+          type: string
+
+    UserProfile:
+      type: object
+      properties:
+        state:
+          type: string
+        age:
+          type: integer
+        occupation:
+          type: string
+        annual_income:
+          type: integer
+        land_holdings_acres:
+          type: number
+        caste_category:
+          type: string
+
+    SessionResponse:
+      type: object
+      properties:
+        session_id:
+          type: string
+        created_at:
+          type: string
+        expires_at:
+          type: string

@@ -1,0 +1,370 @@
+
+openapi: 3.0.3
+info:
+  title: Sahayak AI API
+  description: |
+    Voice-first multilingual government scheme assistant for Indian citizens.
+    All endpoints require Cognito JWT authentication.
+    PII handling compliant with India DPDP Act 2023.
+  version: 1.0.0
+  contact:
+    name: Sahayak AI Platform Team
+    email: platform@sahayak.gov.in
+
+servers:
+  - url: https://api.sahayak.gov.in/v1
+    description: Production
+  - url: https://api-staging.sahayak.gov.in/v1
+    description: Staging
+
+security:
+  - CognitoJWT: []
+
+tags:
+  - name: Conversations
+  - name: Voice
+  - name: Schemes
+  - name: Eligibility
+  - name: User Profile
+
+paths:
+  /conversations:
+    post:
+      tags: [Conversations]
+      summary: Start a new conversation session
+      operationId: createConversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                channel:
+                  type: string
+                  enum: [web, mobile, ivr, kiosk]
+                language_preference:
+                  type: string
+                  enum: [hi, en, auto]
+                  default: auto
+      responses:
+        201:
+          description: Session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id: { type: string }
+                  created_at: { type: string, format: date-time }
+                  welcome_message: { type: string }
+                  welcome_audio_url: { type: string }
+
+  /conversations/{session_id}/turns:
+    post:
+      tags: [Conversations]
+      summary: Submit a conversation turn (voice or text)
+      operationId: submitTurn
+      parameters:
+        - name: session_id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input_type]
+              properties:
+                input_type:
+                  type: string
+                  enum: [text, audio]
+                text:
+                  type: string
+                  description: Required if input_type is text
+                  maxLength: 1000
+                audio_s3_key:
+                  type: string
+                  description: S3 key of uploaded audio file (if input_type is audio)
+                language_hint:
+                  type: string
+                  enum: [hi, en, auto]
+                  default: auto
+                user_context:
+                  type: object
+                  description: Optional user context hints
+                  properties:
+                    location_state: { type: string }
+                    age: { type: integer }
+                    occupation: { type: string }
+      responses:
+        200:
+          description: Successful turn response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurnResponse'
+        400:
+          $ref: '#/components/responses/BadRequest'
+        429:
+          $ref: '#/components/responses/RateLimited'
+
+  /voice/upload-url:
+    post:
+      tags: [Voice]
+      summary: Get presigned S3 URL for audio upload
+      operationId: getAudioUploadUrl
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                content_type: { type: string, default: audio/webm }
+                file_size_bytes: { type: integer }
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                properties:
+                  upload_url: { type: string }
+                  s3_key: { type: string }
+                  expires_in: { type: integer }
+
+  /schemes:
+    get:
+      tags: [Schemes]
+      summary: List/search government schemes
+      operationId: listSchemes
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Full-text search query
+        - name: category
+          in: query
+          schema: { type: string }
+        - name: state
+          in: query
+          schema: { type: string }
+        - name: occupation
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schemes:
+                    type: array
+                    items: { $ref: '#/components/schemas/Scheme' }
+                  total: { type: integer }
+
+  /eligibility/check:
+    post:
+      tags: [Eligibility]
+      summary: Check eligibility for a specific scheme
+      operationId: checkEligibility
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scheme_id]
+              properties:
+                scheme_id: { type: string }
+                use_saved_profile: { type: boolean, default: true }
+                user_profile_override: { type: object }
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EligibilityResult'
+
+  /users/profile:
+    get:
+      tags: [User Profile]
+      summary: Get authenticated user profile
+      responses:
+        200:
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserProfile' }
+    put:
+      tags: [User Profile]
+      summary: Update user profile
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserProfileUpdate' }
+      responses:
+        200:
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserProfile' }
+
+  /users/consent:
+    post:
+      tags: [User Profile]
+      summary: Record user consent (DPDP Act requirement)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data_processing: { type: boolean }
+                scheme_notifications: { type: boolean }
+                analytics_anonymized: { type: boolean }
+                marketing: { type: boolean }
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                properties:
+                  consent_id: { type: string }
+                  recorded_at: { type: string, format: date-time }
+
+  /users/data:
+    delete:
+      tags: [User Profile]
+      summary: Request data erasure (DPDP Act Article 12)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                reason: { type: string }
+      responses:
+        202:
+          content:
+            application/json:
+              schema:
+                properties:
+                  erasure_id: { type: string }
+                  expected_completion: { type: string }
+
+components:
+  securitySchemes:
+    CognitoJWT:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        Retry-After: { schema: { type: integer } }
+
+  schemas:
+    TurnResponse:
+      type: object
+      properties:
+        session_id: { type: string }
+        turn_number: { type: integer }
+        detected_language: { type: string }
+        intent:
+          type: object
+          properties:
+            name: { type: string }
+            confidence: { type: number }
+            entities: { type: object }
+        response:
+          type: object
+          properties:
+            text: { type: string }
+            audio_url: { type: string, nullable: true }
+            audio_expires_in: { type: integer }
+        schemes_referenced:
+          type: array
+          items:
+            type: object
+            properties:
+              scheme_id: { type: string }
+              scheme_name: { type: string }
+              score: { type: number }
+        action_items: { type: array, items: { type: string } }
+        follow_up_suggestions: { type: array, items: { type: string } }
+        eligibility: { $ref: '#/components/schemas/EligibilityResult', nullable: true }
+        metadata:
+          type: object
+          properties:
+            latency_ms: { type: integer }
+            rag_sources: { type: integer }
+            confidence: { type: number }
+
+    EligibilityResult:
+      type: object
+      properties:
+        scheme_id: { type: string }
+        status:
+          type: string
+          enum: [eligible, ineligible, partial, more_info_needed]
+        score: { type: number, minimum: 0, maximum: 1 }
+        recommendation_hi: { type: string }
+        recommendation_en: { type: string }
+        missing_documents: { type: array, items: { type: string } }
+        action_url: { type: string }
+        confidence: { type: number }
+
+    Scheme:
+      type: object
+      properties:
+        scheme_id: { type: string }
+        name_hi: { type: string }
+        name_en: { type: string }
+        ministry: { type: string }
+        categories: { type: array, items: { type: string } }
+        benefit_amount: { type: number, nullable: true }
+        active: { type: boolean }
+        application_url: { type: string }
+
+    UserProfile:
+      type: object
+      properties:
+        user_id: { type: string }
+        state: { type: string }
+        district: { type: string }
+        age: { type: integer }
+        occupation: { type: string }
+        annual_income: { type: number }
+        caste_category: { type: string }
+
+    UserProfileUpdate:
+      type: object
+      properties:
+        state: { type: string }
+        district: { type: string }
+        age: { type: integer, minimum: 0, maximum: 150 }
+        occupation: { type: string }
+        annual_income: { type: number }
+        land_holdings_acres: { type: number }
+        caste_category: { type: string }
+        disability: { type: boolean }
+
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        message: { type: string }
+        request_id: { type: string }
