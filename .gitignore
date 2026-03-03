@@ -1,42 +1,260 @@
-
-# Python
+# Dependencies
+node_modules/
 __pycache__/
-*.py[cod]
-*.so
+*.pyc
+*.pyo
+*.pyd
 .Python
-build/
-dist/
-*.egg-info/
-.env
-.venv
+env/
 venv/
+ENV/
+.venv/
+env.bak/
+venv.bak/
 
-# Terraform
-.terraform/
-*.tfstate
-*.tfstate.backup
-*.tfplan
-.terraform.lock.hcl
+# Build artifacts
+dist/
+build/
+*.egg-info/
+.nyc_output/
+coverage/
+*.whl
+*.tar.gz
 
-# AWS
-.aws/
-*.pem
-*.key
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Artifacts
-artifacts/
-*.zip
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.test
 
-# IDE
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Icon?
+.apdisk
+desktop.ini
+VolumeIcon.icns
+
+# IDE files
 .vscode/
 .idea/
 *.swp
+*.swo
+*~
 
-# Tests
+# Python specific
+.pytest_cache/
 .coverage
 htmlcov/
+.pyup.yml
+.pyre/
+.mypy_cache/
 .pytest_cache/
+.pytest_cache_
+.coverage.xml
 
-# OS
-.DS_Store
-Thumbs.db
+# Node specific
+npm/
+tmp/
+.npm/
+.npx/
+.yarn-integrity
+.yarn/
+.cache/
+.parcel-cache/
+
+# Testing
+.tests/
+testem.js
+coverage/
+.nyc_output/
+__tests__/
+__mocks__/
+
+# Frontend build
+/build/
+/public/vapid-key.json
+*.local
+/dist/
+.parcel-cache/
+.rpt2_cache/
+
+# Sensitive files
+secrets.json
+creds.json
+config/secrets.yml
+credentials.json
+private.pem
+prod-stuff.json
+firebase-key.json
+service-account-key.json
+
+# Documentation
+docs/_build/
+*.tmp
+*.temp
+
+# Deployment
+.dockerignore
+.deploy/
+deployment/
+.stack-work/
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# AWS
+.aws/
+.serverless/
+samconfig.toml
+template.yaml
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# IDE specific
+.vs/
+*.tmproj
+nbproject/
+.settings/
+
+# Machine learning/data science
+*.ipynb_checkpoints/
+*.csv
+*.jsonl
+*.parquet
+*.pkl
+*.pickle
+*.h5
+*.joblib
+*.model
+*.weights
+
+# Local configuration
+config/local.json
+config/production.json
+config/staging.json
+config/development.json
+
+# Lambda build directories
+.lambda/
+.aws-sam/
+.codebuild/
+
+# Frontend cache
+.webpack/
+.happypack/
+.next/
+.nuxt/
+.cache/
+.tmp/
+
+# Mobile
+platforms/
+plugins/
+*.apk
+*.ipa
+ios/
+android/
+
+# Secrets and keys
+*.key
+*.pem
+*.crt
+*.cert
+*.p12
+*.jks
+*.keystore
+*.gpg
+*.asc
+
+# React specific
+.pnp/
+.pnp.js
+
+# Sahayak AI specific
+*.recording.wav
+audio_cache/
+voice_recordings/
+scheme_cache/
+user_sessions/
+
+# Development tools
+.coverage.xml
+.nyc_output/
+coverage/lcov-report/
+
+# Package manager
+pnpm-lock.yaml
+yarn.lock
+package-lock.json.bak
+
+# System files
+[Oo]bj/
+[Bb]in/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]uild[Ll]og.*
+[Bb]uild[Ll]og-*.txt
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Code coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Type checking
+*.tsbuildinfo
+
+# Editor directories and files
+.idea
+*.sln
+*.csproj
+*.csproj.user
+*.csproj.filters
+*.njsproj
+*.njssln
+*.scc
+*.vspscc
+*.vssscc
+*.user
+*.userosscache
+*.suo
+*.user
+*.userosscache
+*.suo
+*.opensdf
+*.sdf
+*.tlog
+*.tlb
+*.tlh
+*.bak
+*.cache
+*.lock
+*.log

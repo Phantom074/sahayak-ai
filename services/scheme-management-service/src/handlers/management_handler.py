@@ -1,6 +1,6 @@
 """
-Eligibility Handler
-API endpoints for checking user eligibility for government schemes.
+Scheme Management Handler
+API endpoints for scheme administration, ingestion, and updates.
 """
 
 import json
@@ -12,27 +12,27 @@ from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 
-from ..rules.rule_engine import RuleEngine
-from ..evaluators.eligibility_evaluator import EligibilityEvaluator
+from ..ingestion.document_ingester import DocumentIngester
+from ..admin.scheme_admin import SchemeAdmin
 
 logger = Logger()
 tracer = Tracer()
 
-class EligibilityHandler:
-    """Handles eligibility checking operations."""
+class SchemeManagementHandler:
+    """Handles scheme management operations."""
     
     def __init__(self):
-        self.rule_engine = RuleEngine()
-        self.evaluator = EligibilityEvaluator()
+        self.admin = SchemeAdmin()
+        self.ingester = DocumentIngester()
     
     @tracer.capture_method
-    def check_eligibility(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        """Check if user is eligible for a scheme."""
+    def create_scheme(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new government scheme."""
         try:
             body = json.loads(event.get('body', '{}')) if event.get('body') else {}
             
             # Validate required fields
-            required_fields = ['scheme_id', 'user_profile']
+            required_fields = ['scheme_name', 'description', 'benefits']
             for field in required_fields:
                 if field not in body:
                     return {
@@ -43,15 +43,16 @@ class EligibilityHandler:
                         })
                     }
             
-            scheme_id = body['scheme_id']
-            user_profile = body['user_profile']
-            
-            # Check eligibility
-            eligibility_result = self.evaluator.check_eligibility(scheme_id, user_profile)
+            # Create scheme
+            scheme_id = self.admin.create_scheme(body)
             
             return {
-                'statusCode': 200,
-                'body': json.dumps(eligibility_result),
+                'statusCode': 201,
+                'body': json.dumps({
+                    'scheme_id': scheme_id,
+                    'message': 'Scheme created successfully',
+                    'message_hi': 'योजना सफलतापूर्वक बनाई गई'
+                }),
                 'headers': {
                     'Content-Type': 'application/json',
                     'Access-Control-Allow-Origin': '*'
@@ -67,7 +68,7 @@ class EligibilityHandler:
                 })
             }
         except Exception as e:
-            logger.exception(f"Error checking eligibility: {str(e)}")
+            logger.exception(f"Error creating scheme: {str(e)}")
             return {
                 'statusCode': 500,
                 'body': json.dumps({
@@ -78,62 +79,14 @@ class EligibilityHandler:
             }
     
     @tracer.capture_method
-    def get_scheme_rules(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        """Get eligibility rules for a scheme."""
-        try:
-            scheme_id = event['pathParameters']['scheme_id']
-            
-            # Get rules
-            rules = self.rule_engine.get_rules(scheme_id)
-            
-            if not rules:
-                return {
-                    'statusCode': 404,
-                    'body': json.dumps({
-                        'error': 'Scheme rules not found',
-                        'message_hi': 'योजना नियम नहीं मिले'
-                    })
-                }
-            
-            return {
-                'statusCode': 200,
-                'body': json.dumps(rules),
-                'headers': {
-                    'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*'
-                }
-            }
-            
-        except KeyError:
-            return {
-                'statusCode': 400,
-                'body': json.dumps({
-                    'error': 'Missing scheme_id in path',
-                    'message_hi': 'पथ में scheme_id गुम'
-                })
-            }
-        except Exception as e:
-            logger.exception(f"Error getting scheme rules: {str(e)}")
-            return {
-                'statusCode': 500,
-                'body': json.dumps({
-                    'error': 'Internal server error',
-                    'message': str(e),
-                    'message_hi': 'आंतरिक सर्वर त्रुटि'
-                })
-            }
-    
-    @tracer.capture_method
-    def update_scheme_rules(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        """Update eligibility rules for a scheme."""
+    def update_scheme(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Update an existing government scheme."""
         try:
             scheme_id = event['pathParameters']['scheme_id']
             body = json.loads(event.get('body', '{}')) if event.get('body') else {}
             
-            rules = body.get('rules', [])
-            
-            # Update rules
-            success = self.rule_engine.update_rules(scheme_id, rules)
+            # Update scheme
+            success = self.admin.update_scheme(scheme_id, body)
             
             if not success:
                 return {
@@ -148,8 +101,8 @@ class EligibilityHandler:
                 'statusCode': 200,
                 'body': json.dumps({
                     'scheme_id': scheme_id,
-                    'message': 'Rules updated successfully',
-                    'message_hi': 'नियम सफलतापूर्वक अपडेट किए गए'
+                    'message': 'Scheme updated successfully',
+                    'message_hi': 'योजना सफलतापूर्वक अपडेट की गई'
                 }),
                 'headers': {
                     'Content-Type': 'application/json',
@@ -174,7 +127,7 @@ class EligibilityHandler:
                 })
             }
         except Exception as e:
-            logger.exception(f"Error updating scheme rules: {str(e)}")
+            logger.exception(f"Error updating scheme: {str(e)}")
             return {
                 'statusCode': 500,
                 'body': json.dumps({
@@ -185,18 +138,30 @@ class EligibilityHandler:
             }
     
     @tracer.capture_method
-    def get_eligibility_analysis(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        """Get detailed analysis of eligibility criteria."""
+    def delete_scheme(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Delete a government scheme."""
         try:
             scheme_id = event['pathParameters']['scheme_id']
-            user_profile = json.loads(event.get('body', '{}')).get('user_profile', {})
             
-            # Get analysis
-            analysis = self.evaluator.analyze_eligibility(scheme_id, user_profile)
+            # Delete scheme
+            success = self.admin.delete_scheme(scheme_id)
+            
+            if not success:
+                return {
+                    'statusCode': 404,
+                    'body': json.dumps({
+                        'error': 'Scheme not found',
+                        'message_hi': 'योजना नहीं मिली'
+                    })
+                }
             
             return {
                 'statusCode': 200,
-                'body': json.dumps(analysis),
+                'body': json.dumps({
+                    'scheme_id': scheme_id,
+                    'message': 'Scheme deleted successfully',
+                    'message_hi': 'योजना सफलतापूर्वक हटा दी गई'
+                }),
                 'headers': {
                     'Content-Type': 'application/json',
                     'Access-Control-Allow-Origin': '*'
@@ -211,6 +176,61 @@ class EligibilityHandler:
                     'message_hi': 'पथ में scheme_id गुम'
                 })
             }
+        except Exception as e:
+            logger.exception(f"Error deleting scheme: {str(e)}")
+            return {
+                'statusCode': 500,
+                'body': json.dumps({
+                    'error': 'Internal server error',
+                    'message': str(e),
+                    'message_hi': 'आंतरिक सर्वर त्रुटि'
+                })
+            }
+    
+    @tracer.capture_method
+    def ingest_documents(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Ingest scheme documents for search/indexing."""
+        try:
+            body = json.loads(event.get('body', '{}')) if event.get('body') else {}
+            scheme_id = body.get('scheme_id')
+            document_urls = body.get('document_urls', [])
+            
+            if not scheme_id:
+                return {
+                    'statusCode': 400,
+                    'body': json.dumps({
+                        'error': 'Missing scheme_id',
+                        'message_hi': 'scheme_id गुम'
+                    })
+                }
+            
+            if not document_urls:
+                return {
+                    'statusCode': 400,
+                    'body': json.dumps({
+                        'error': 'Missing document_urls',
+                        'message_hi': 'document_urls गुम'
+                    })
+                }
+            
+            # Process documents
+            results = self.ingester.ingest_documents(scheme_id, document_urls)
+            
+            return {
+                'statusCode': 200,
+                'body': json.dumps({
+                    'scheme_id': scheme_id,
+                    'documents_processed': len(document_urls),
+                    'results': results,
+                    'message': 'Documents ingested successfully',
+                    'message_hi': 'दस्तावेज़ सफलतापूर्वक संसाधित'
+                }),
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                }
+            }
+            
         except json.JSONDecodeError:
             return {
                 'statusCode': 400,
@@ -220,34 +240,34 @@ class EligibilityHandler:
                 })
             }
         except Exception as e:
-            logger.exception(f"Error getting eligibility analysis: {str(e)}")
+            logger.exception(f"Error ingesting documents: {str(e)}")
             return {
                 'statusCode': 500,
                 'body': json.dumps({
-                    'error': 'Internal server error',
+                    'error': 'Internal server error during document ingestion',
                     'message': str(e),
-                    'message_hi': 'आंतरिक सर्वर त्रुटि'
+                    'message_hi': 'दस्तावेज़ संसाधन के दौरान आंतरिक त्रुटि'
                 })
             }
 
 
 def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
-    """Lambda entry point for eligibility checking."""
-    handler = EligibilityHandler()
+    """Lambda entry point for scheme management."""
+    handler = SchemeManagementHandler()
     
     # Extract HTTP method and path
     http_method = event.get('httpMethod', '').upper()
     resource_path = event.get('resource', '')
     
     try:
-        if resource_path == '/eligibility/check' and http_method == 'POST':
-            return handler.check_eligibility(event)
-        elif resource_path == '/eligibility/rules/{scheme_id}' and http_method == 'GET':
-            return handler.get_scheme_rules(event)
-        elif resource_path == '/eligibility/rules/{scheme_id}' and http_method == 'PUT':
-            return handler.update_scheme_rules(event)
-        elif resource_path == '/eligibility/analyze/{scheme_id}' and http_method == 'POST':
-            return handler.get_eligibility_analysis(event)
+        if resource_path == '/schemes' and http_method == 'POST':
+            return handler.create_scheme(event)
+        elif resource_path == '/schemes/{scheme_id}' and http_method == 'PUT':
+            return handler.update_scheme(event)
+        elif resource_path == '/schemes/{scheme_id}' and http_method == 'DELETE':
+            return handler.delete_scheme(event)
+        elif resource_path == '/schemes/ingest' and http_method == 'POST':
+            return handler.ingest_documents(event)
         else:
             return {
                 'statusCode': 404,
@@ -257,7 +277,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 })
             }
     except Exception as e:
-        logger.exception(f"Unhandled error in eligibility handler: {str(e)}")
+        logger.exception(f"Unhandled error in scheme management handler: {str(e)}")
         return {
             'statusCode': 500,
             'body': json.dumps({

@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sahayak AI - Government Scheme Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #f1f5f9;
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 40px 0 30px;
+            margin-bottom: 20px;
+        }
+        
+        .logo-circle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #3b82f6, #60a5fa);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+            border: 3px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .logo-text {
+            font-size: 2.8rem;
+            font-weight: 800;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            font-size: 2.8rem;
+            margin-bottom: 12px;
+            font-weight: 700;
+            background: linear-gradient(to right, #60a5fa, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            font-size: 1.3rem;
+            opacity: 0.9;
+            margin-bottom: 30px;
+            color: #cbd5e1;
+            font-weight: 400;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-top: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .panel {
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(74, 85, 104, 0.5);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .panel:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
+        }
+        
+        .panel h2 {
+            margin-bottom: 25px;
+            color: #93c5fd;
+            font-size: 1.8rem;
+            font-weight: 600;
+            border-bottom: 2px solid rgba(147, 197, 253, 0.2);
+            padding-bottom: 10px;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .feature {
+            background: rgba(51, 65, 85, 0.6);
+            padding: 25px 20px;
+            border-radius: 15px;
+            text-align: center;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(147, 197, 253, 0.1);
+        }
+        
+        .feature:hover {
+            background: rgba(74, 85, 104, 0.8);
+            transform: translateY(-3px);
+        }
+        
+        .feature i {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            display: block;
+            color: #93c5fd;
+        }
+        
+        .feature h3 {
+            color: #e2e8f0;
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+        
+        .feature p {
+            color: #cbd5e1;
+            font-size: 0.95rem;
+        }
+        
+        .chat-demo {
+            display: flex;
+            flex-direction: column;
+            height: 450px;
+            background: rgba(15, 23, 42, 0.7);
+            border-radius: 15px;
+            overflow: hidden;
+            border: 1px solid rgba(74, 85, 104, 0.3);
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 25px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            background: rgba(15, 23, 42, 0.5);
+        }
+        
+        .message {
+            max-width: 85%;
+            padding: 16px 20px;
+            border-radius: 20px;
+            position: relative;
+            animation: fadeIn 0.3s ease;
+            font-size: 1rem;
+            line-height: 1.5;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .message-user {
+            align-self: flex-end;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+        
+        .message-bot {
+            align-self: flex-start;
+            background: rgba(74, 85, 104, 0.8);
+            color: #f1f5f9;
+            border-bottom-left-radius: 5px;
+        }
+        
+        .chat-input {
+            display: flex;
+            padding: 20px;
+            background: rgba(30, 41, 59, 0.9);
+            border-top: 1px solid rgba(74, 85, 104, 0.3);
+            gap: 12px;
+        }
+        
+        .chat-input input {
+            flex: 1;
+            padding: 15px 20px;
+            border: none;
+            border-radius: 50px;
+            outline: none;
+            font-size: 1rem;
+            background: rgba(15, 23, 42, 0.8);
+            color: #f1f5f9;
+            border: 1px solid rgba(74, 85, 104, 0.3);
+        }
+        
+        .chat-input input::placeholder {
+            color: #94a3b8;
+        }
+        
+        .chat-input button {
+            padding: 15px 22px;
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            min-width: 55px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .chat-input button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4);
+        }
+        
+        .voice-btn {
+            background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+        }
+        
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 35px;
+            padding: 20px;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 15px;
+            border: 1px solid rgba(74, 85, 104, 0.3);
+        }
+        
+        @media (max-width: 768px) {
+            .status-bar {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+        
+        .api-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1rem;
+        }
+        
+        .status-indicator {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background-color: #48bb78;
+        }
+        
+        .running {
+            background-color: #48bb78;
+            box-shadow: 0 0 10px rgba(72, 187, 120, 0.5);
+        }
+        
+        .stopped {
+            background-color: #e53e3e;
+            box-shadow: 0 0 10px rgba(229, 62, 62, 0.5);
+        }
+        
+        .instructions {
+            margin-top: 40px;
+            padding: 25px;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 15px;
+            text-align: center;
+            border: 1px solid rgba(74, 85, 104, 0.3);
+        }
+        
+        .instructions h3 {
+            color: #93c5fd;
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+        }
+        
+        .instructions ol {
+            text-align: left;
+            display: inline-block;
+            margin-top: 10px;
+            padding-left: 25px;
+            color: #cbd5e1;
+            font-size: 1.05rem;
+        }
+        
+        .instructions li {
+            margin-bottom: 10px;
+            line-height: 1.7;
+        }
+        
+        .highlight {
+            background: linear-gradient(135deg, #3b82f6, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 600;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Scrollbar styling */
+        .chat-messages::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-track {
+            background: rgba(30, 41, 59, 0.3);
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-circle">
+                <span class="logo-text">SA</span>
+            </div>
+            <h1>Sahayak AI - Government Scheme Assistant</h1>
+            <p class="subtitle">Your voice-enabled assistant for government schemes</p>
+        </header>
+        
+        <div class="dashboard">
+            <div class="panel">
+                <h2>Features & Capabilities</h2>
+                <div class="features">
+                    <div class="feature">
+                        <div>🎤</div>
+                        <h3>Voice Interaction</h3>
+                        <p>Speak in Hindi or English to interact with the assistant using advanced speech recognition</p>
+                    </div>
+                    <div class="feature">
+                        <div>🌐</div>
+                        <h3>Multilingual Support</h3>
+                        <p>Support for 10+ Indian languages including Hindi, English, Bengali, Tamil, Telugu and more</p>
+                    </div>
+                    <div class="feature">
+                        <div>📋</div>
+                        <h3>Detailed Scheme Info</h3>
+                        <p>Get comprehensive information about government schemes, eligibility criteria and application process</p>
+                    </div>
+                    <div class="feature">
+                        <div>✅</div>
+                        <h3>Eligibility Check</h3>
+                        <p>Instantly check if you qualify for specific schemes based on your profile and requirements</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h2>Live Chat Demo</h2>
+                <div class="chat-demo">
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message message-bot">
+                            नमस्ते! मैं सहायक एआई हूं। मैं आपको सरकारी योजनाओं के बारे में जानकारी देने में मदद कर सकता हूं। क्या आप किसी विशेष योजना के बारे में जानना चाहते हैं?
+                        </div>
+                        <div class="message message-user">
+                            मुझे पीएम किसान योजना के बारे में बताइए
+                        </div>
+                        <div class="message message-bot">
+                            प्रधानमंत्री किसान सम्मान निधि (पीएम-किसान) योजना किसानों को वित्तीय सहायता प्रदान करती है। इस योजना के तहत पात्र किसानों को प्रति वर्ष ₹6,000 की सीधी नकद राशि तीन समान चरणों में उनके बैंक खातों में जारी की जाती है।
+                        </div>
+                    </div>
+                    <div class="chat-input">
+                        <button class="voice-btn" title="Voice Input">🎤</button>
+                        <input type="text" id="messageInput" placeholder="Type your message or question about government schemes...">
+                        <button onclick="sendMessage()" title="Send Message">➤</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="status-bar">
+            <div class="api-status">
+                <div class="status-indicator running"></div>
+                <span>Backend API: Running on <span class="highlight">http://localhost:8000</span></span>
+            </div>
+            <div class="api-status">
+                <div class="status-indicator stopped"></div>
+                <span>Frontend: Not running (requires Node.js)</span>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>How to Run the Complete Application</h3>
+            <ol>
+                <li><span class="highlight">Backend Server:</span> Currently running on port 8000 ✓</li>
+                <li><span class="highlight">Frontend Setup:</span> Install Node.js (LTS version recommended)</li>
+                <li><span class="highlight">Navigate to frontend:</span> cd frontend &amp;&amp; npm install</li>
+                <li><span class="highlight">Start frontend:</span> npm start (runs on port 3000)</li>
+                <li><span class="highlight">Access app:</span> Visit <span class="highlight">http://localhost:3000</span> in your browser</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (message) {
+                // Add user message
+                const chatMessages = document.getElementById('chatMessages');
+                const userMessageDiv = document.createElement('div');
+                userMessageDiv.className = 'message message-user';
+                userMessageDiv.textContent = message;
+                chatMessages.appendChild(userMessageDiv);
+                
+                // Scroll to bottom
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                // Simulate bot response
+                setTimeout(() => {
+                    const botMessageDiv = document.createElement('div');
+                    botMessageDiv.className = 'message message-bot';
+                    
+                    if (message.toLowerCase().includes('scheme') || message.toLowerCase().includes('yojana') || message.toLowerCase().includes('pm') || message.toLowerCase().includes('kisan')) {
+                        botMessageDiv.textContent = 'यह एक नमूना उत्तर है। वास्तविक लाभार्थी जांच और योजना जानकारी बैकएंड से प्राप्त की जाएगी।';
+                    } else {
+                        botMessageDiv.textContent = 'मैं आपकी सहायता के लिए यहां हूं। कृपया सरकारी योजनाओं के बारे में अपना प्रश्न पूछें।';
+                    }
+                    
+                    chatMessages.appendChild(botMessageDiv);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }, 1000);
+                
+                input.value = '';
+            }
+        }
+        
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // Auto-scroll to bottom on load
+        document.addEventListener('DOMContentLoaded', function() {
+            const chatMessages = document.getElementById('chatMessages');
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+    </script>
+</body>
+</html>

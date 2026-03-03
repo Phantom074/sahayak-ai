@@ -1,0 +1,96 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sahayak-ai"
+version = "1.0.0"
+description = "Voice-first, multilingual AI assistant helping Indian citizens access government schemes"
+readme = "README.md"
+authors = [{name = "Sahayak AI Team", email = "platform@sahayak.gov.in"}]
+license = {text = "Apache-2.0"}
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Government",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "boto3>=1.34.0",
+    "aws-lambda-powertools>=2.30.0",
+    "fastapi>=0.104.1",
+    "uvicorn>=0.24.0",
+    "PyPDF2>=3.0.1",
+    "python-docx>=1.1.0",
+    "lxml>=4.9.3",
+    "asyncio-mqtt>=0.14.0",
+    "cryptography>=41.0.7",
+    "python-dotenv>=1.0.0",
+    "typing-extensions>=4.8.0",
+    "requests>=2.31.0",
+    "urllib3>=2.0.7",
+    "dataclasses-json>=0.6.4",
+    "marshmallow>=3.20.1",
+    "aiofiles>=23.2.1",
+    "async-timeout>=4.0.3",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-sdk>=1.21.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.21.0",
+    "redis>=5.0.1",
+    "diskcache>=5.6.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.3",
+    "pytest-asyncio>=0.21.1",
+    "black>=23.9.1",
+    "flake8>=6.0.0",
+    "mypy>=1.5.1",
+    "pre-commit>=3.4.0",
+    "types-requests>=2.31.0.2",
+]
+test = [
+    "pytest>=7.4.3",
+    "pytest-asyncio>=0.21.1",
+    "pytest-cov>=4.1.0",
+    "mock>=5.1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sahayak_ai*", "shared*", "services*"]
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
+skip-string-normalization = true
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "--verbose --tb=short"
+markers = [
+    "slow: marks tests as slow",
+    "integration: marks tests as integration tests",
+]
+
+[tool.coverage.run]
+source = ["services", "shared"]
+omit = ["*/tests/*", "*/__pycache__/*", "*/venv/*", "*/.venv/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]

@@ -1,38 +1,41 @@
 """
-Eligibility Handler
-API endpoints for checking user eligibility for government schemes.
+User Profile Handler
+API endpoints for user profile management and privacy controls.
 """
 
 import json
 import logging
 import os
+import uuid
 from typing import Dict, Any, Optional
 
 from aws_lambda_powertools import Logger, Tracer
 from aws_lambda_powertools.utilities.typing import LambdaContext
 from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
 
-from ..rules.rule_engine import RuleEngine
-from ..evaluators.eligibility_evaluator import EligibilityEvaluator
+from ..repositories.profile_repository import ProfileRepository
+from ..privacy.consent_manager import ConsentManager
+from ..privacy.data_masker import DataMasker
 
 logger = Logger()
 tracer = Tracer()
 
-class EligibilityHandler:
-    """Handles eligibility checking operations."""
+class UserProfileHandler:
+    """Handles user profile operations."""
     
     def __init__(self):
-        self.rule_engine = RuleEngine()
-        self.evaluator = EligibilityEvaluator()
+        self.repo = ProfileRepository()
+        self.consent_manager = ConsentManager()
+        self.masker = DataMasker()
     
     @tracer.capture_method
-    def check_eligibility(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        """Check if user is eligible for a scheme."""
+    def create_profile(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new user profile."""
         try:
             body = json.loads(event.get('body', '{}')) if event.get('body') else {}
             
             # Validate required fields
-            required_fields = ['scheme_id', 'user_profile']
+            required_fields = ['phone_number', 'language_preference']
             for field in required_fields:
                 if field not in body:
                     return {
@@ -43,15 +46,16 @@ class EligibilityHandler:
                         })
                     }
             
-            scheme_id = body['scheme_id']
-            user_profile = body['user_profile']
-            
-            # Check eligibility
-            eligibility_result = self.evaluator.check_eligibility(scheme_id, user_profile)
+            # Create profile
+            profile_id = self.repo.create_profile(body)
             
             return {
-                'statusCode': 200,
-                'body': json.dumps(eligibility_result),
+                'statusCode': 201,
+                'body': json.dumps({
+                    'profile_id': profile_id,
+                    'message': 'Profile created successfully',
+                    'message_hi': 'प्रोफ़ाइल सफलतापूर्वक बनाया गया'
+                }),
                 'headers': {
                     'Content-Type': 'application/json',
                     'Access-Control-Allow-Origin': '*'
@@ -67,7 +71,7 @@ class EligibilityHandler:
                 })
             }
         except Exception as e:
-            logger.exception(f"Error checking eligibility: {str(e)}")
+            logger.exception(f"Error creating profile: {str(e)}")
             return {
                 'statusCode': 500,
                 'body': json.dumps({
@@ -78,26 +82,29 @@ class EligibilityHandler:
             }
     
     @tracer.capture_method
-    def get_scheme_rules(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        """Get eligibility rules for a scheme."""
+    def get_profile(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Get user profile by ID."""
         try:
-            scheme_id = event['pathParameters']['scheme_id']
+            profile_id = event['pathParameters']['profile_id']
             
-            # Get rules
-            rules = self.rule_engine.get_rules(scheme_id)
+            # Get profile
+            profile = self.repo.get_profile(profile_id)
             
-            if not rules:
+            if not profile:
                 return {
                     'statusCode': 404,
                     'body': json.dumps({
-                        'error': 'Scheme rules not found',
-                        'message_hi': 'योजना नियम नहीं मिले'
+                        'error': 'Profile not found',
+                        'message_hi': 'प्रोफ़ाइल नहीं मिला'
                     })
                 }
             
+            # Apply data masking based on consent
+            masked_profile = self.masker.apply_masking(profile, profile_id)
+            
             return {
                 'statusCode': 200,
-                'body': json.dumps(rules),
+                'body': json.dumps(masked_profile),
                 'headers': {
                     'Content-Type': 'application/json',
                     'Access-Control-Allow-Origin': '*'
@@ -108,12 +115,12 @@ class EligibilityHandler:
             return {
                 'statusCode': 400,
                 'body': json.dumps({
-                    'error': 'Missing scheme_id in path',
-                    'message_hi': 'पथ में scheme_id गुम'
+                    'error': 'Missing profile_id in path',
+                    'message_hi': 'पथ में profile_id गुम'
                 })
             }
         except Exception as e:
-            logger.exception(f"Error getting scheme rules: {str(e)}")
+            logger.exception(f"Error getting profile: {str(e)}")
             return {
                 'statusCode': 500,
                 'body': json.dumps({
@@ -124,32 +131,30 @@ class EligibilityHandler:
             }
     
     @tracer.capture_method
-    def update_scheme_rules(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        """Update eligibility rules for a scheme."""
+    def update_profile(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Update user profile."""
         try:
-            scheme_id = event['pathParameters']['scheme_id']
+            profile_id = event['pathParameters']['profile_id']
             body = json.loads(event.get('body', '{}')) if event.get('body') else {}
             
-            rules = body.get('rules', [])
-            
-            # Update rules
-            success = self.rule_engine.update_rules(scheme_id, rules)
+            # Update profile
+            success = self.repo.update_profile(profile_id, body)
             
             if not success:
                 return {
                     'statusCode': 404,
                     'body': json.dumps({
-                        'error': 'Scheme not found',
-                        'message_hi': 'योजना नहीं मिली'
+                        'error': 'Profile not found',
+                        'message_hi': 'प्रोफ़ाइल नहीं मिला'
                     })
                 }
             
             return {
                 'statusCode': 200,
                 'body': json.dumps({
-                    'scheme_id': scheme_id,
-                    'message': 'Rules updated successfully',
-                    'message_hi': 'नियम सफलतापूर्वक अपडेट किए गए'
+                    'profile_id': profile_id,
+                    'message': 'Profile updated successfully',
+                    'message_hi': 'प्रोफ़ाइल सफलतापूर्वक अपडेट किया गया'
                 }),
                 'headers': {
                     'Content-Type': 'application/json',
@@ -161,8 +166,8 @@ class EligibilityHandler:
             return {
                 'statusCode': 400,
                 'body': json.dumps({
-                    'error': 'Missing scheme_id in path',
-                    'message_hi': 'पथ में scheme_id गुम'
+                    'error': 'Missing profile_id in path',
+                    'message_hi': 'पथ में profile_id गुम'
                 })
             }
         except json.JSONDecodeError:
@@ -174,7 +179,7 @@ class EligibilityHandler:
                 })
             }
         except Exception as e:
-            logger.exception(f"Error updating scheme rules: {str(e)}")
+            logger.exception(f"Error updating profile: {str(e)}")
             return {
                 'statusCode': 500,
                 'body': json.dumps({
@@ -185,18 +190,17 @@ class EligibilityHandler:
             }
     
     @tracer.capture_method
-    def get_eligibility_analysis(self, event: Dict[str, Any]) -> Dict[str, Any]:
-        """Get detailed analysis of eligibility criteria."""
+    def get_consent_status(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Get user's consent status."""
         try:
-            scheme_id = event['pathParameters']['scheme_id']
-            user_profile = json.loads(event.get('body', '{}')).get('user_profile', {})
+            profile_id = event['pathParameters']['profile_id']
             
-            # Get analysis
-            analysis = self.evaluator.analyze_eligibility(scheme_id, user_profile)
+            # Get consent status
+            consent_status = self.consent_manager.get_consent_status(profile_id)
             
             return {
                 'statusCode': 200,
-                'body': json.dumps(analysis),
+                'body': json.dumps(consent_status),
                 'headers': {
                     'Content-Type': 'application/json',
                     'Access-Control-Allow-Origin': '*'
@@ -207,8 +211,51 @@ class EligibilityHandler:
             return {
                 'statusCode': 400,
                 'body': json.dumps({
-                    'error': 'Missing scheme_id in path',
-                    'message_hi': 'पथ में scheme_id गुम'
+                    'error': 'Missing profile_id in path',
+                    'message_hi': 'पथ में profile_id गुम'
+                })
+            }
+        except Exception as e:
+            logger.exception(f"Error getting consent status: {str(e)}")
+            return {
+                'statusCode': 500,
+                'body': json.dumps({
+                    'error': 'Internal server error',
+                    'message': str(e),
+                    'message_hi': 'आंतरिक सर्वर त्रुटि'
+                })
+            }
+    
+    @tracer.capture_method
+    def update_consent(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Update user's consent preferences."""
+        try:
+            profile_id = event['pathParameters']['profile_id']
+            body = json.loads(event.get('body', '{}')) if event.get('body') else {}
+            
+            granted_purposes = body.get('granted_purposes', [])
+            revoked_purposes = body.get('revoked_purposes', [])
+            
+            # Update consent
+            consent_result = self.consent_manager.update_consent(
+                profile_id, granted_purposes, revoked_purposes
+            )
+            
+            return {
+                'statusCode': 200,
+                'body': json.dumps(consent_result),
+                'headers': {
+                    'Content-Type': 'application/json',
+                    'Access-Control-Allow-Origin': '*'
+                }
+            }
+            
+        except KeyError:
+            return {
+                'statusCode': 400,
+                'body': json.dumps({
+                    'error': 'Missing profile_id in path',
+                    'message_hi': 'पथ में profile_id गुम'
                 })
             }
         except json.JSONDecodeError:
@@ -220,7 +267,7 @@ class EligibilityHandler:
                 })
             }
         except Exception as e:
-            logger.exception(f"Error getting eligibility analysis: {str(e)}")
+            logger.exception(f"Error updating consent: {str(e)}")
             return {
                 'statusCode': 500,
                 'body': json.dumps({
@@ -232,22 +279,24 @@ class EligibilityHandler:
 
 
 def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, Any]:
-    """Lambda entry point for eligibility checking."""
-    handler = EligibilityHandler()
+    """Lambda entry point for user profile management."""
+    handler = UserProfileHandler()
     
     # Extract HTTP method and path
     http_method = event.get('httpMethod', '').upper()
     resource_path = event.get('resource', '')
     
     try:
-        if resource_path == '/eligibility/check' and http_method == 'POST':
-            return handler.check_eligibility(event)
-        elif resource_path == '/eligibility/rules/{scheme_id}' and http_method == 'GET':
-            return handler.get_scheme_rules(event)
-        elif resource_path == '/eligibility/rules/{scheme_id}' and http_method == 'PUT':
-            return handler.update_scheme_rules(event)
-        elif resource_path == '/eligibility/analyze/{scheme_id}' and http_method == 'POST':
-            return handler.get_eligibility_analysis(event)
+        if resource_path == '/profiles' and http_method == 'POST':
+            return handler.create_profile(event)
+        elif resource_path == '/profiles/{profile_id}' and http_method == 'GET':
+            return handler.get_profile(event)
+        elif resource_path == '/profiles/{profile_id}' and http_method == 'PUT':
+            return handler.update_profile(event)
+        elif resource_path == '/profiles/{profile_id}/consent' and http_method == 'GET':
+            return handler.get_consent_status(event)
+        elif resource_path == '/profiles/{profile_id}/consent' and http_method == 'POST':
+            return handler.update_consent(event)
         else:
             return {
                 'statusCode': 404,
@@ -257,7 +306,7 @@ def lambda_handler(event: Dict[str, Any], context: LambdaContext) -> Dict[str, A
                 })
             }
     except Exception as e:
-        logger.exception(f"Unhandled error in eligibility handler: {str(e)}")
+        logger.exception(f"Unhandled error in profile handler: {str(e)}")
         return {
             'statusCode': 500,
             'body': json.dumps({
