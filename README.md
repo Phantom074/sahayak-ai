@@ -9,7 +9,7 @@ Sahayak AI is a production-grade, event-driven serverless platform built on AWS,
 ## Quick Start
 
 ```bash
-git clone https://github.com/your-org/sahayak-ai.git
+git clone https://github.com/Phantom074/sahayak-ai.git
 cd sahayak-ai
 
 # Deploy infrastructure (dev)
